@@ -1,0 +1,36 @@
+Name:           {{{ git_dir_name }}}
+Version:        {{{ git_dir_version }}}
+Release:        1%{?dist}
+Summary:        Upload missing objects to an OSTree repository
+
+License:        GPLv3
+URL:            https://github.com/lirios/ostree-upload
+VCS:            {{{ git_dir_vcs }}}
+Source:         {{{ git_dir_pack }}}
+
+ExclusiveArch:  %{rust_arches}
+
+BuildRequires:  rust-packaging
+BuildRequires:  ostree-devel
+
+Requires: ostree
+
+%description
+Upload missing objects to an OSTree repository.
+
+%prep
+{{{ git_dir_setup_macro }}}
+
+%build
+cargo build --locked
+
+%install
+install -Dm755 target/debug/ostree-receive %{buildroot}%{_bindir}/ostree-receive
+install -Dm755 target/debug/ostree-upload %{buildroot}%{_bindir}/ostree-upload
+
+%files
+%{_bindir}/ostree-receive
+%{_bindir}/ostree-upload
+
+%changelog
+{{{ git_dir_changelog }}}

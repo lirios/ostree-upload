@@ -1,10 +1,9 @@
-FROM rust:1.40-slim AS build
+FROM alpine:3.11 AS build
 RUN mkdir /source
-Add . /source/
+ADD . /source/
 WORKDIR /source
 RUN set -ex && \
-    apt-get update && \
-    apt-get install -y libostree-dev libssl-dev && \
+    apk add rust cargo ostree-dev openssl-dev && \
     cargo build --release && \
     strip target/release/ostree-upload && \
     strip target/release/ostree-receive && \
@@ -15,4 +14,5 @@ RUN set -ex && \
 FROM alpine:3.11
 COPY --from=build /build/ostree-upload /usr/bin
 COPY --from=build /build/ostree-receive /usr/bin
+RUN apk add ostree openssl
 ENTRYPOINT ["/usr/bin/ostree-upload"]

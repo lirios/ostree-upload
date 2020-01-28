@@ -23,7 +23,7 @@ deploy:
   provider: script
   script: ./.travis/docker-push
   on:
-    branch: develop
+    branch: feature/fasterci
     condition: $TRAVIS_RUST_VERSION = stable
 
 notifications:

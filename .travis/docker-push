@@ -1,6 +1,7 @@
 #!/bin/bash
 
 image=liriorg/ostree-upload
+curdir=$(readlink -f `dirname $0`)
 
 echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-docker build -t $image . && docker push $image
+docker build -f ${curdir}/Dockefile -t $image . && docker push $image

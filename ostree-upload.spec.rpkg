@@ -12,6 +12,7 @@ ExclusiveArch:  %{rust_arches}
 
 BuildRequires:  rust-packaging
 BuildRequires:  ostree-devel
+BuildRequires:  openssl-devel
 
 Requires: ostree
 

@@ -29,10 +29,10 @@ On Fedora:
 sudo dnf install -y cargo
 ```
 
-This programs also use the OSTree library:
+This programs also use the OSTree library and OpenSSL:
 
 ```sh
-sudo dnf install -y ostree-devel
+sudo dnf install -y ostree-devel openssl-devel
 ```
 
 ## Installation

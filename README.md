@@ -3,7 +3,7 @@ ostree-upload
 
 [![License](https://img.shields.io/badge/license-GPLv3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 [![GitHub release](https://img.shields.io/github/release/lirios/ostree-upload.svg)](https://github.com/lirios/ostree-upload)
-[![Build Status](https://travis-ci.org/lirios/ostree-upload.svg?branch=develop)](https://travis-ci.org/lirios/ostree-upload)
+[![CI](https://github.com/lirios/ostree-upload/workflows/CI/badge.svg?branch=develop)](https://github.com/lirios/ostree-upload/actions?query=workflow%3ACI)
 [![GitHub issues](https://img.shields.io/github/issues/lirios/ostree-upload.svg)](https://github.com/lirios/ostree-upload/issues)
 
 ostree-upload provides two programs:

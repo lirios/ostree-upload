@@ -1,6 +1,0 @@
-#!/bin/bash
-
-image=liriorg/ostree-upload
-
-echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-docker build -t $image . && docker push $image

@@ -1,18 +1,21 @@
+# SPDX-FileCopyrightText: 2020 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# See https://docs.fedoraproject.org/en-US/packaging-guidelines/Golang/
+
 Name:           {{{ git_dir_name }}}
 Version:        {{{ git_dir_version }}}
 Release:        1%{?dist}
 Summary:        Upload missing objects to an OSTree repository
 
-License:        GPLv3
+License:        AGPLv3
 URL:            https://github.com/lirios/ostree-upload
 VCS:            {{{ git_dir_vcs }}}
 Source:         {{{ git_dir_pack }}}
 
-ExclusiveArch:  %{rust_arches}
-
-BuildRequires:  rust-packaging
+BuildRequires:  go-rpm-macros
 BuildRequires:  ostree-devel
-BuildRequires:  openssl-devel
 
 Requires: ostree
 
@@ -23,15 +26,10 @@ Upload missing objects to an OSTree repository.
 {{{ git_dir_setup_macro }}}
 
 %build
-cargo build --locked
+make
 
 %install
-install -Dm755 target/debug/ostree-receive %{buildroot}%{_bindir}/ostree-receive
-install -Dm755 target/debug/ostree-upload %{buildroot}%{_bindir}/ostree-upload
+make install DESTDIR=%{buildroot} PREFIX=%{_prefix}
 
 %files
-%{_bindir}/ostree-receive
 %{_bindir}/ostree-upload
-
-%changelog
-{{{ git_dir_changelog }}}

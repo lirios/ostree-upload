@@ -1,18 +1,21 @@
-FROM alpine:3.11 AS build
+# SPDX-FileCopyrightText: 2020 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
+
+FROM golang:alpine AS build
 RUN mkdir /source
-ADD . /source/
+COPY . /source/
 WORKDIR /source
 RUN set -ex && \
-    apk add rust cargo ostree-dev openssl-dev && \
-    cargo build --release && \
-    strip target/release/ostree-upload && \
-    strip target/release/ostree-receive && \
+    apk --no-cache add ca-certificates build-base make git ostree-dev && \
+    go mod download && \
+    make && \
+    strip bin/ostree-upload && \
     mkdir /build && \
-    cp target/release/ostree-upload /build/ && \
-    cp target/release/ostree-receive /build/
+    cp bin/ostree-upload /build/
 
-FROM alpine:3.11
-COPY --from=build /build/ostree-upload /usr/bin
-COPY --from=build /build/ostree-receive /usr/bin
-RUN apk add ostree openssl
+FROM alpine
+COPY --from=build /build/ostree-upload /usr/bin/ostree-upload
+RUN apk --no-cache add libc6-compat ostree
 ENTRYPOINT ["/usr/bin/ostree-upload"]
+CMD ["--help"]

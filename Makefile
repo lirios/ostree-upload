@@ -1,7 +1,41 @@
-IMAGE=liriorg/ostree-upload
+# SPDX-FileCopyrightText: 2020 Pier Luigi Fiorini <pierluigi.fiorini@gmail.com>
+#
+# SPDX-License-Identifier: CC0-1.0
 
-image:
-	@podman build -t $(IMAGE) .
+TAGS :=
+LDFLAGS := -w -s
+GOFLAGS :=
 
-push:
-	@podman push $(shell podman images $(IMAGE) --format '{{.ID}}') docker://docker.io/$(IMAGE)
+DESTDIR :=
+PREFIX := /usr/local
+BINDIR := $(CURDIR)/bin
+BINNAME ?= ostree-upload
+
+C_SRC := $(shell find . -type f -name "*.[ch]")
+GO_SRC := $(shell find . -type f -name "*.go")
+
+.PHONY: all
+all: build
+
+.PHONY: build
+build: $(BINDIR)/$(BINNAME)
+
+$(BINDIR)/$(BINNAME): $(GO_SRC)
+	(cd cmd && GO111MODULE=on go build $(GOFLAGS) -tags '$(TAGS)' -ldflags '$(LDFLAGS)' -o $@)
+
+.PHONY: install
+install: $(BINDIR)/$(BINNAME)
+	install -Dm755 $< $(DESTDIR)$(PREFIX)/bin/$(BINNAME)
+
+.PHONY: clean
+clean:
+	@rm -rf $(BINDIR)
+
+.PHONY: test
+test:
+	GO111MODULE=on go test $(GOFLAGS) -run . ./...
+
+.PHONY: format
+format:
+	GO111MODULE=on gofmt -w .
+	clang-format -i $(C_SRC)

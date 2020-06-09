@@ -4,5 +4,4 @@
 
 *~
 *.swp
-/bin/ostree-receiver
-/bin/ostree-upload
+/bin/

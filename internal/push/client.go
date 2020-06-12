@@ -6,6 +6,7 @@ package push
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/lirios/ostree-upload/internal/logger"
 )
@@ -86,6 +87,7 @@ func StartClient(url, token, path string, refs []string, prune bool) error {
 	}
 
 	// Send objects
+	startTime := time.Now()
 	uploadDoneChan, uploadErrChan := pusher.Upload(client, queueID, wantedObjectNames, objects)
 	select {
 	case <-uploadDoneChan:
@@ -97,6 +99,8 @@ func StartClient(url, token, path string, refs []string, prune bool) error {
 		}
 		return err
 	}
+	elapsedTime := time.Since(startTime)
+	logger.Infof("Upload took %s", elapsedTime)
 
 	// Update refs
 	if err := client.Done(queueID); err != nil {

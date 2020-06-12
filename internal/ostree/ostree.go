@@ -161,6 +161,9 @@ func (r *Repo) GetParentRev(rev string) (string, error) {
 	if C.ostree_repo_load_variant_if_exists(r.native(), C.OSTREE_OBJECT_TYPE_COMMIT, C.CString(rev), &variantC, &errC) == C.FALSE {
 		return "", convertGError(errC)
 	}
+	if variantC == nil {
+		return "", fmt.Errorf("commit %s doesn't exist", rev)
+	}
 	return C.GoString(C.ostree_commit_get_parent(variantC)), nil
 }
 

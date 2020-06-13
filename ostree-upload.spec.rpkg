@@ -16,6 +16,7 @@ Source:         {{{ git_dir_pack }}}
 
 BuildRequires:  go-rpm-macros
 BuildRequires:  ostree-devel
+BuildRequires:  git
 
 Requires: ostree
 

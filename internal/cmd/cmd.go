@@ -153,6 +153,9 @@ func pushCmd() *cobra.Command {
 
 			// Check the token
 			if len(token) == 0 {
+				token = os.Getenv("OSTREE_UPLOAD_TOKEN")
+			}
+			if len(token) == 0 {
 				logger.Fatal("Token is mandatory")
 				return
 			}

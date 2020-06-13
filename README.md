@@ -187,11 +187,11 @@ If you instead wants to use Docker type something like:
 
 ```sh
 docker run --rm -it \
-  -v $(pwd)/ostree-upload.yaml \
-  -v $(pwd)/repo \
+  -v $(pwd)/ostree-upload.yaml:/etc/ostree-upload.yaml \
+  -v $(pwd)/repo:/var/repo \
   -p 8080:8080 \
   liriorg/ostree-upload \
-  receive
+  receive -c /etc/ostree-upload.yaml -r /var/repo
 ```
 
 ## Client
@@ -213,10 +213,10 @@ If you instead wants to use Docker type something like:
 
 ```sh
 docker run --rm -it \
-  -v $(pwd)/ostree-upload.yaml \
-  -v $(pwd)/repo \
+  -v $(pwd)/ostree-upload.yaml:/etc/ostree-upload.yaml \
+  -v $(pwd)/repo:/var/repo \
   liriorg/ostree-upload \
-  push --token=<TOKEN>
+  push --token=<TOKEN> -c /etc/ostree-upload.yaml -r /var/repo
 ```
 
 ## Licensing

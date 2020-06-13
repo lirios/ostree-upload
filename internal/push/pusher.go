@@ -60,6 +60,7 @@ func (p *Pusher) FindNeededCommits(remoteRev, localRev string) ([]string, error)
 	parent := localRev
 
 	for parent != remoteRev {
+		logger.Debugf("Parent commit %s", parent)
 		commits = append(commits, parent)
 
 		newParent, err := p.repo.GetParentRev(parent)

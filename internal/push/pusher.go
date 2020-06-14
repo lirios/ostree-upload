@@ -7,7 +7,6 @@ package push
 import (
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/lirios/ostree-upload/internal/common"
 	"github.com/lirios/ostree-upload/internal/logger"
@@ -159,48 +158,4 @@ func (p *Pusher) FindObjectsToPush(updateRefs map[string]common.RevisionPair) (c
 	}
 
 	return neededObjects, nil
-}
-
-// Upload uploads all objects simultaneously
-func (p *Pusher) Upload(client *Client, queueID string, wantedObjectNames []string, objects common.Objects) (chan bool, chan error) {
-	var wg sync.WaitGroup
-	quitChan := make(chan bool, 1)
-	errChan := make(chan error, 1)
-
-	logger.Actionf("Sending %d/%d objects...", len(wantedObjectNames), len(objects))
-
-	// Increment counter
-	wg.Add(len(wantedObjectNames))
-
-	// Put a limit of the number of concurrent uploads
-	maxGoroutines := min(512, len(wantedObjectNames))
-	guardChan := make(chan bool, maxGoroutines)
-
-	// Upload simultaneously
-	itemsLeft := len(wantedObjectNames)
-	for _, objectName := range wantedObjectNames {
-		logger.Debugf("Uploading \"%s\" (%d/%d)...", objectName, itemsLeft, len(wantedObjectNames))
-		guardChan <- true
-		itemsLeft--
-
-		go func(objectName string, object common.Object) {
-			defer func() {
-				wg.Done()
-				<-guardChan
-			}()
-
-			err := client.Upload(queueID, &object)
-			if err != nil {
-				errChan <- fmt.Errorf("Failed to upload object \"%s\": %v", objectName, err)
-			}
-		}(objectName, objects[objectName])
-	}
-
-	// Wait until all goroutines are done
-	go func() {
-		wg.Wait()
-		quitChan <- true
-	}()
-
-	return quitChan, errChan
 }

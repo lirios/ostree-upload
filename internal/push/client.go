@@ -6,8 +6,8 @@ package push
 
 import (
 	"fmt"
-	"time"
 
+	"github.com/lirios/ostree-upload/internal/common"
 	"github.com/lirios/ostree-upload/internal/logger"
 )
 
@@ -86,21 +86,26 @@ func StartClient(url, token, path string, refs []string, prune bool) error {
 		return fmt.Errorf("Failed to retrieve the list of objects to upload: %v", err)
 	}
 
+	// List of objects to upload
+	wantedObjects := common.Objects{}
+	for objectName, object := range objects {
+		for _, wantedObjectName := range wantedObjectNames {
+			if objectName == wantedObjectName {
+				wantedObjects[objectName] = object
+				break
+			}
+		}
+	}
+
 	// Send objects
-	startTime := time.Now()
-	uploadDoneChan, uploadErrChan := pusher.Upload(client, queueID, wantedObjectNames, objects)
-	select {
-	case <-uploadDoneChan:
-		break
-	case err := <-uploadErrChan:
-		logger.Error(err)
+	logger.Actionf("Sending %d/%d objects...", len(wantedObjects), len(objects))
+	if err := client.Upload(queueID, wantedObjects); err != nil {
+		logger.Errorf("Failed to upload: %v", err)
 		if err := client.DeleteQueueEntry(queueID); err != nil {
 			logger.Errorf("Failed to delete entry \"%s\" from queue: %v", queueID, err)
 		}
-		return err
+		return nil
 	}
-	elapsedTime := time.Since(startTime)
-	logger.Infof("Upload took %s", elapsedTime)
 
 	// Update refs
 	if err := client.Done(queueID); err != nil {
@@ -108,6 +113,7 @@ func StartClient(url, token, path string, refs []string, prune bool) error {
 		if err := client.DeleteQueueEntry(queueID); err != nil {
 			logger.Errorf("Failed to delete entry \"%s\" from queue: %v", queueID, err)
 		}
+		return nil
 	}
 
 	logger.Info("Done!")

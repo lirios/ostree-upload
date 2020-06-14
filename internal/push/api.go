@@ -40,7 +40,7 @@ func NewClient(endpoint, token string) (*Client, error) {
 	transport := &http.Transport{
 		DisableCompression: false,
 	}
-	httpClient := &http.Client{Transport: transport, Timeout: 60 * time.Second}
+	httpClient := &http.Client{Transport: transport, Timeout: 60 * time.Minute}
 
 	return &Client{u, "ostree-upload", httpClient, token}, nil
 }
@@ -102,7 +102,7 @@ func (c *Client) do(request *http.Request, v interface{}) (*http.Response, error
 		}
 	}
 
-	return response, err
+	return response, nil
 }
 
 // GetInfo retries remote repository information
@@ -171,44 +171,53 @@ func (c *Client) SendObjectsList(queueID string) ([]string, error) {
 }
 
 // Upload uploads an object
-func (c *Client) Upload(queueID string, object *common.Object) error {
-	file, err := os.Open(object.ObjectPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+func (c *Client) Upload(queueID string, objects common.Objects) error {
+	r, w := io.Pipe()
+	writer := multipart.NewWriter(w)
 
-	body := &bytes.Buffer{}
+	errChan := make(chan error)
 
-	writer := multipart.NewWriter(body)
+	go func() {
+		defer func() {
+			writer.Close()
+			w.Close()
+			errChan <- nil
+		}()
 
-	if err := writer.WriteField("rev", object.Rev); err != nil {
-		return err
-	}
-	if err := writer.WriteField("object_name", object.ObjectName); err != nil {
-		return err
-	}
-	if err := writer.WriteField("checksum", object.Checksum); err != nil {
-		return err
-	}
+		for _, object := range objects {
+			// Upload each object independently
+			part, err := writer.CreateFormFile("file", object.ObjectName)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-	part, err := writer.CreateFormFile("file", object.ObjectName)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(part, file)
-	if err != nil {
-		return err
-	}
+			file, err := os.Open(object.ObjectPath)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-	if err := writer.Close(); err != nil {
-		return err
-	}
+			if _, err = io.Copy(part, file); err != nil {
+				file.Close()
+				errChan <- err
+				return
+			}
+
+			file.Close()
+
+			// Let the server verify the checksum
+			if err := writer.WriteField("checksum", fmt.Sprintf("%s:%s", object.ObjectName, object.Checksum)); err != nil {
+				errChan <- err
+				return
+			}
+		}
+	}()
 
 	rel := &url.URL{Path: fmt.Sprintf("/api/v1/queue/%s", queueID)}
 	u := c.url.ResolveReference(rel)
 
-	request, err := http.NewRequest("PUT", u.String(), body)
+	request, err := http.NewRequest("PUT", u.String(), r)
 	if err != nil {
 		return err
 	}
@@ -222,9 +231,10 @@ func (c *Client) Upload(queueID string, object *common.Object) error {
 		return err
 	}
 
-	// Wait for the connection to be closed to avoid the "too many open files"
-	// error on the server
-	time.Sleep(15 * time.Second)
+	err = <-errChan
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

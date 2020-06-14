@@ -5,11 +5,14 @@
 package receiver
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/chilts/sid"
 	"github.com/go-chi/chi"
@@ -234,63 +237,101 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse up to 10 MiB
-	r.ParseMultipartForm(10 * 1024 * 1024)
+	var mr *multipart.Reader
+	var part *multipart.Part
 
-	// Read form values
-	//rev := r.FormValue("rev")
-	objectName := r.FormValue("object_name")
-	checksum := r.FormValue("checksum")
-
-	// Get the file
-	file, _, err := r.FormFile("file")
-	if err != nil {
-		logger.Errorf("Unable to read file field: %v", err)
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
-		return
-	}
-	defer file.Close()
-
-	// Create the destination file
-	objectPath := GetTempObjectPath(repo, objectName)
-	if _, err := os.Stat(objectPath); os.IsExist(err) {
-		msg := fmt.Sprintf("temporary file for object \"%s\" already exist", objectName)
-		logger.Errorf("Unable to complete upload: %s")
-		http.Error(w, msg, http.StatusUnprocessableEntity)
-		return
-	}
-	objectFile, err := os.Create(objectPath)
-	if err != nil {
-		logger.Errorf("Unable to create %s: %v", objectName, err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if _, err := io.Copy(objectFile, file); err != nil {
-		logger.Errorf("Failed to write %s: %v", objectName, err)
-		objectFile.Close()
-		os.Remove(objectPath)
+	if mr, err = r.MultipartReader(); err != nil {
+		logger.Errorf("Multipart error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Close files immediately to avoid "too many open files" error
-	file.Close()
-	objectFile.Close()
+	// Save checksums here for later comparison
+	checksums := map[string]string{}
 
-	// Verify checksum
-	dstChecksum, err := common.CalculateChecksum(objectPath)
-	if err != nil {
-		logger.Errorf("Unable to calculate checksum of %s: %v", objectPath, err)
-		os.Remove(objectPath)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if checksum != dstChecksum {
-		logger.Errorf("Invalid checksum for %s", objectName)
-		os.Remove(objectPath)
-		msg := fmt.Sprintf("Checksum %s instead of %s for %s", dstChecksum, checksum, objectName)
-		http.Error(w, msg, http.StatusInternalServerError)
-		return
+	// Read all parts
+	for {
+		if part, err = mr.NextPart(); err != nil {
+			if err == io.EOF {
+				// Exit when we read all the parts
+				w.WriteHeader(200)
+			} else {
+				logger.Errorf("Error reading part: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+			return
+		}
+
+		if part.FormName() == "file" {
+			// Receive file
+			objectName := part.FileName()
+			logger.Debugf("Receiving \"%s\"...", objectName)
+
+			// Create the destination file
+			objectPath := GetTempObjectPath(repo, objectName)
+			if _, err := os.Stat(objectPath); os.IsExist(err) {
+				msg := fmt.Sprintf("temporary file for object \"%s\" already exist", objectName)
+				logger.Errorf("Unable to complete upload: %s")
+				http.Error(w, msg, http.StatusUnprocessableEntity)
+				return
+			}
+			objectFile, err := os.Create(objectPath)
+			if err != nil {
+				logger.Errorf("Unable to create %s: %v", objectName, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			defer objectFile.Close()
+
+			// Write chunks and calculate checksum for a verification later
+			if _, err = io.Copy(objectFile, part); err != nil {
+				logger.Errorf("Failed to copy part to \"%s\": %v", objectName, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			objectFile.Close()
+			checksum, err := common.CalculateChecksum(objectPath)
+			if err != nil {
+				logger.Errorf("Failed to calculate checksum of \"%s\": %v", objectName, err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			checksums[objectName] = checksum
+		} else if part.FormName() == "checksum" {
+			// Read checksum calculate by the client
+			value := &bytes.Buffer{}
+			if _, err = io.Copy(value, part); err != nil {
+				logger.Errorf("Failed to read checksum: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			args := strings.Split(value.String(), ":")
+			if len(args) != 2 {
+				logger.Error("Failed to receive checksum: bad format")
+				http.Error(w, "bad checksum format", http.StatusUnprocessableEntity)
+				return
+			}
+			objectName := args[0]
+			checksum := args[1]
+			if objectName == "" || checksum == "" {
+				logger.Error("Failed to receive checksum: empty object name or checksum")
+				http.Error(w, "empty object name or checksum", http.StatusUnprocessableEntity)
+				return
+			}
+
+			// If the checksum doesn't match we remove the object and report the error,
+			// so that the next time the object will be uploaded again
+			if checksums[objectName] != checksum {
+				//os.Remove(GetTempObjectPath(repo, objectName))
+				logger.Errorf("Object \"%s\" has a bad checksum (%s vs %s)", objectName, checksums[objectName], checksum)
+				http.Error(w, fmt.Sprintf("bad checksum for %s", objectName), http.StatusUnprocessableEntity)
+				return
+			}
+		} else {
+			logger.Errorf("Received unsupported form field %s", part.FormName())
+			http.Error(w, fmt.Sprintf("unsupported form field %s", part.FormName()), http.StatusUnprocessableEntity)
+			return
+		}
 	}
 }
 

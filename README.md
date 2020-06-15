@@ -157,9 +157,9 @@ If you instead wants to use Docker type something like:
 
 ```sh
 docker run --rm -it \
-  -v $(pwd)/ostree-upload.yaml \
+  -v $(pwd)/ostree-upload.yaml:/etc/ostree-upload.yaml \
   liriorg/ostree-upload \
-  gentoken
+  gentoken -c /etc/ostree-upload.yaml
 ```
 
 ## Server

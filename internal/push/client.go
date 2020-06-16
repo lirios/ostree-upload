@@ -97,19 +97,10 @@ func StartClient(url, token, path string, refs []string, prune bool) error {
 		}
 	}
 
-	// Send objects
+	// Send objects and update refs
 	logger.Actionf("Sending %d/%d objects...", len(wantedObjects), len(objects))
 	if err := client.Upload(queueID, wantedObjects); err != nil {
 		logger.Errorf("Failed to upload: %v", err)
-		if err := client.DeleteQueueEntry(queueID); err != nil {
-			logger.Errorf("Failed to delete entry \"%s\" from queue: %v", queueID, err)
-		}
-		return nil
-	}
-
-	// Update refs
-	if err := client.Done(queueID); err != nil {
-		logger.Errorf("Failed to update refs: %v", err)
 		if err := client.DeleteQueueEntry(queueID); err != nil {
 			logger.Errorf("Failed to delete entry \"%s\" from queue: %v", queueID, err)
 		}

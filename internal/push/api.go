@@ -238,18 +238,3 @@ func (c *Client) Upload(queueID string, objects common.Objects) error {
 
 	return nil
 }
-
-// Done tells the server that the upload is done
-func (c *Client) Done(queueID string) error {
-	request, err := c.newRequest("GET", fmt.Sprintf("/api/v1/done/%s", queueID), nil)
-	if err != nil {
-		return err
-	}
-
-	_, err = c.do(request, nil)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}

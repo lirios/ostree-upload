@@ -15,7 +15,6 @@ type QueueEntry struct {
 	ID         string
 	UpdateRefs map[string]common.RevisionPair
 	Objects    []string
-	Finalizing bool
 }
 
 // Queue represents the update queue

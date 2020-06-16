@@ -35,7 +35,6 @@ func v1Router(appState *AppState) http.Handler {
 	r.Delete("/queue/{queueID}", DeleteEntryHandler)
 	r.Get("/queue/{queueID}", ObjectsHandler)
 	r.Put("/queue/{queueID}", UploadHandler)
-	r.Get("/done/{queueID}", DoneHandler)
 
 	return r
 }

@@ -231,12 +231,6 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prevent from uploading when it's finalizing
-	if entry.Finalizing {
-		http.Error(w, "cannot upload objects when the update process is almost done", http.StatusUnprocessableEntity)
-		return
-	}
-
 	var mr *multipart.Reader
 	var part *multipart.Part
 
@@ -254,12 +248,12 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		if part, err = mr.NextPart(); err != nil {
 			if err == io.EOF {
 				// Exit when we read all the parts
-				w.WriteHeader(200)
+				break
 			} else {
 				logger.Errorf("Error reading part: %v", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
 			}
-			return
 		}
 
 		if part.FormName() == "file" {
@@ -333,78 +327,44 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+
+	// Now publish the branches
+	if err = publishBranches(repo, entry); err != nil {
+		logger.Errorf("Cannot publish branches for queue entry %s: %v", queueID, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	// Remove entry
+	if err := queue.RemoveEntry(entry); err != nil {
+		logger.Errorf("Failed to delete queue entry %s: %v", queueID, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
-// DoneHandler signals that the upload is complete
-func DoneHandler(w http.ResponseWriter, r *http.Request) {
-	// Get from context
-	ctx := r.Context()
-	queue, ok := ctx.Value(KeyQueue).(*Queue)
-	if !ok {
-		logger.Error("Unable to retrieve queue object from context")
-		http.Error(w, "no queue found", http.StatusUnprocessableEntity)
-		return
-	}
-	repo, ok := ctx.Value(KeyRepository).(*ostree.Repo)
-	if !ok {
-		logger.Error("Unable to retrieve repository object from context")
-		http.Error(w, "no repository found", http.StatusUnprocessableEntity)
-		return
-	}
-
-	// Get the entry from the queue
-	queueID := chi.URLParam(r, "queueID")
-	entry, err := queue.GetEntry(queueID)
-	if err != nil {
-		logger.Errorf("Unable to retrieve queue entry: %v", err)
-		http.Error(w, fmt.Sprintf("failed to get entry from queue: %v", err), http.StatusNotFound)
-		return
-	}
-	if entry == nil {
-		logger.Error("Unable to find queue entry")
-		http.Error(w, "queue entry not found", http.StatusNotFound)
-		return
-	}
-
-	// Prevent from finalizing twice
-	if entry.Finalizing {
-		http.Error(w, "already finalizing", http.StatusInternalServerError)
-		return
-	}
-
-	// Move all received objects
-	entry.Finalizing = true
-	logger.Infof("Queue %s: publishing %d objects", queueID, len(entry.Objects))
+func publishBranches(repo *ostree.Repo, entry *QueueEntry) error {
+	logger.Infof("Queue %s: publishing %d objects", entry.ID, len(entry.Objects))
 	for _, objectName := range entry.Objects {
 		// Create path where the object will be moved to
 		objectPath := repo.GetObjectPath(objectName)
 		path := filepath.Dir(objectPath)
 		if err := os.MkdirAll(path, 0755); err != nil {
-			msg := fmt.Sprintf("failed to create directory \"%s\" for the objects: %v", path, err)
-			http.Error(w, msg, http.StatusInternalServerError)
-			return
+			return fmt.Errorf("failed to create directory \"%s\" for the objects: %v", path, err)
 		}
 
 		// Move from the temporary location to the proper path only if it wasn't previously moved
 		if _, err := os.Stat(objectPath); os.IsNotExist(err) {
 			tempPath := GetTempObjectPath(repo, objectName)
 			if err := moveFile(tempPath, objectPath); err != nil {
-				msg := fmt.Sprintf("unable to move \"%s\" to \"%s\": %v", tempPath, objectPath, err)
-				http.Error(w, msg, http.StatusInternalServerError)
-				return
+				return fmt.Errorf("unable to move \"%s\" to \"%s\": %v", tempPath, objectPath, err)
 			}
 		}
 	}
 
 	// Update refs
 	if err := UpdateRefs(repo, entry.UpdateRefs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	// Remove entry
-	if err := queue.RemoveEntry(entry); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	return nil
 }

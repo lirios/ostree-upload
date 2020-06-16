@@ -25,7 +25,7 @@ const (
 )
 
 // Name of the temporary directory inside the OSTree repository
-const tempDirName = ".tmp"
+const tempDirName = "tmp/ostree-upload"
 
 // CreateTempDirectory creates a temporary directory inside the repository, used to store the objects during the upload
 func CreateTempDirectory(r *ostree.Repo) error {

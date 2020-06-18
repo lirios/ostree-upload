@@ -58,5 +58,9 @@ func UpdateRefs(r *ostree.Repo, refs map[string]common.RevisionPair) error {
 		}
 	}
 
+	if err := r.RegenerateSummary(); err != nil {
+		return fmt.Errorf("Failed to regenerate summary: %v", err)
+	}
+
 	return nil
 }

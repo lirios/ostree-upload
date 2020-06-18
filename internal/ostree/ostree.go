@@ -269,3 +269,17 @@ func (r *Repo) SetRefImmediate(remote, ref, checksum string) error {
 
 	return nil
 }
+
+// RegenerateSummary updates the summary
+func (r *Repo) RegenerateSummary() error {
+	if r.ptr == nil {
+		return errors.New("repo not initialized")
+	}
+
+	var errC *C.GError
+	if C.ostree_repo_regenerate_summary(r.native(), nil, nil, &errC) == C.FALSE {
+		return convertGError(errC)
+	}
+
+	return nil
+}

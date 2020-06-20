@@ -27,6 +27,9 @@ func convertGError(errC *C.GError) error {
 	return err
 }
 
+// WalkFunc is a function called by Walk() for each file
+type WalkFunc func(path string) error
+
 // Repo represents a local ostree repository
 type Repo struct {
 	path string
@@ -249,6 +252,106 @@ func (r *Repo) Prune(noPrune, onlyRefs bool) (int, int, uint64, error) {
 	}
 
 	return int(total), int(pruned), uint64(size), nil
+}
+
+func (r *Repo) walkStart(root *C.GFile, path string, walkFn WalkFunc) error {
+	f := C.g_file_resolve_relative_path(root, C.CString(path))
+	defer C.g_object_unref(C.gpointer(f))
+
+	var errC *C.GError
+	opts := "standard::name,standard::type,standard::size,standard::is-symlink,standard::symlink-target,unix::device,unix::inode,unix::mode,unix::uid,unix::gid,unix::rdev"
+	info := C.g_file_query_info(f, C.CString(opts), C.G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nil, &errC)
+	if info == nil {
+		return convertGError(errC)
+	}
+
+	if C.g_file_info_get_file_type(info) == C.G_FILE_TYPE_DIRECTORY {
+		if _, err := r.walkRecurse(f, 1, walkFn); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *Repo) walkRecurse(root *C.GFile, depth int, walkFn WalkFunc) (bool, error) {
+	var errC *C.GError
+	opts := "standard::name,standard::type"
+	enumerator := C.g_file_enumerate_children(root, C.CString(opts), C.G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nil, &errC)
+	if enumerator == nil {
+		return false, convertGError(errC)
+	}
+	defer C.g_object_unref(C.gpointer(enumerator))
+
+	for {
+		info := C.g_file_enumerator_next_file(enumerator, nil, nil)
+		if info == nil {
+			return false, nil
+		}
+		defer C.g_object_unref(C.gpointer(info))
+
+		child := C.g_file_enumerator_get_child(enumerator, info)
+		defer C.g_object_unref(C.gpointer(child))
+
+		// Call function with the absolute path to the child
+		pathC := C.g_file_get_path(child)
+		if err := walkFn(C.GoString(pathC)); err != nil {
+			return false, err
+		}
+
+		if C.g_file_info_get_file_type(info) == C.G_FILE_TYPE_DIRECTORY {
+			result, err := r.walkRecurse(child, depth, walkFn)
+			if err != nil {
+				return false, err
+			}
+			if !result {
+				return false, nil
+			}
+		}
+	}
+
+	return true, nil
+}
+
+// Walk walks the path and execute walkFn for each file
+func (r *Repo) Walk(rev, path string, walkFn WalkFunc) error {
+	var root *C.GFile
+	var commitC *C.char
+	var errC *C.GError
+	if C.ostree_repo_read_commit(r.native(), C.CString(rev), &root, &commitC, nil, &errC) == C.FALSE {
+		return convertGError(errC)
+	}
+
+	if err := r.walkStart(root, path, walkFn); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Checkout checks out the specified path from the revision rev
+func (r *Repo) Checkout(rev, path, destPath string) error {
+	var root *C.GFile
+	var commitC *C.char
+	var errC *C.GError
+	if C.ostree_repo_read_commit(r.native(), C.CString(rev), &root, &commitC, nil, &errC) == C.FALSE {
+		return convertGError(errC)
+	}
+
+	subtree := C.g_file_resolve_relative_path(root, C.CString(path))
+
+	opts := "standard::name,standard::type,standard::size,standard::is-symlink,standard::symlink-target,unix::device,unix::inode,unix::mode,unix::uid,unix::gid,unix::rdev"
+	info := C.g_file_query_info(subtree, C.CString(opts), C.G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nil, &errC)
+	if info == nil {
+		return convertGError(errC)
+	}
+
+	dest := C.g_file_new_for_path(C.CString(destPath))
+	if C.ostree_repo_checkout_tree(r.native(), C.OSTREE_REPO_CHECKOUT_MODE_USER, 0, dest, C._ostree_repo_file(subtree), info, nil, &errC) == C.FALSE {
+		return convertGError(errC)
+	}
+
+	return nil
 }
 
 // SetRefImmediate points ref to checksum for the specified remote

@@ -25,3 +25,11 @@ static void _g_variant_get_su(GVariant *v, const char **checksum,
 }
 
 static const char *_g_strdup(gpointer string) { return g_strdup(string); }
+
+static gboolean _ostree_repo_file_ensure_resolved(GFile *file) {
+  return ostree_repo_file_ensure_resolved((OstreeRepoFile *)file, NULL);
+}
+
+static OstreeRepoFile *_ostree_repo_file(GFile *file) {
+  return OSTREE_REPO_FILE(file);
+}

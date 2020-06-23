@@ -17,7 +17,7 @@ using an HTTP API.
 
 `ostree-upload` provides three subcommands:
 
- * **gentoken**: Generate an API token (more on that later)
+ * **gentoken**: Generate an API token (more on that later).
  * **receive**: An HTTP server that lets you upload missing objects
    of an OSTree repository.
  * **push**: An HTTP client that uploads missing objects of one

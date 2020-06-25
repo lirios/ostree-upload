@@ -9,8 +9,8 @@ ostree-upload
 
 [![License](https://img.shields.io/badge/license-AGPLv3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
 [![GitHub release](https://img.shields.io/github/release/lirios/ostree-upload.svg)](https://github.com/lirios/ostree-upload)
-[![CI](https://github.com/lirios/ostree-upload/workflows/CI/badge.svg?branch=develop)](https://github.com/lirios/ostree-upload/actions?query=workflow%3ACI)
 [![GitHub issues](https://img.shields.io/github/issues/lirios/ostree-upload.svg)](https://github.com/lirios/ostree-upload/issues)
+[![CI](https://github.com/lirios/ostree-upload/workflows/CI/badge.svg?branch=develop)](https://github.com/lirios/ostree-upload/actions?query=workflow%3ACI)
 
 `ostree-upload` push commits from a local OSTree repository to a remote one,
 using an HTTP API.
@@ -141,6 +141,17 @@ changed to point to the new commit.
 
 The concept behind this program was slightly inspiered by [ostree-push](https://github.com/dbnicholson/ostree-push),
 which appears to be abandoned nowadays.
+
+## Configuration file
+
+Format:
+
+```yaml
+tokens:
+  - token: <TOKEN>
+    created: <TIMESTAMP>
+  - ...
+```
 
 ## Token
 

@@ -277,7 +277,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			defer objectFile.Close()
 
-			// Write chunks and calculate checksum for a verification later
+			// Write file and calculate checksum for a verification later
 			if _, err = io.Copy(objectFile, part); err != nil {
 				logger.Errorf("Failed to copy part to \"%s\": %v", objectName, err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -316,7 +316,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 			// If the checksum doesn't match we remove the object and report the error,
 			// so that the next time the object will be uploaded again
 			if checksums[objectName] != checksum {
-				//os.Remove(GetTempObjectPath(repo, objectName))
+				os.Remove(GetTempObjectPath(repo, objectName))
 				logger.Errorf("Object \"%s\" has a bad checksum (%s vs %s)", objectName, checksums[objectName], checksum)
 				http.Error(w, fmt.Sprintf("bad checksum for %s", objectName), http.StatusUnprocessableEntity)
 				return

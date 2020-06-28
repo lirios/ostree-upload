@@ -24,7 +24,7 @@ import (
 
 // Client is used to upload objects to a receiver
 type Client struct {
-	url        *url.URL
+	endpoint   string
 	userAgent  string
 	httpClient *http.Client
 	token      string
@@ -32,7 +32,7 @@ type Client struct {
 
 // NewClient creates a new upload client connecting to the specified receiver endpoint
 func NewClient(endpoint, token string) (*Client, error) {
-	u, err := url.Parse(endpoint)
+	_, err := url.Parse(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -42,12 +42,14 @@ func NewClient(endpoint, token string) (*Client, error) {
 	}
 	httpClient := &http.Client{Transport: transport, Timeout: 60 * time.Minute}
 
-	return &Client{u, "ostree-upload", httpClient, token}, nil
+	return &Client{endpoint, "ostree-upload", httpClient, token}, nil
 }
 
 func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {
-	rel := &url.URL{Path: path}
-	u := c.url.ResolveReference(rel)
+	u, err := url.Parse(fmt.Sprintf("%s%s", c.endpoint, path))
+	if err != nil {
+		return nil, err
+	}
 
 	var buf io.ReadWriter
 	if body != nil {
@@ -214,8 +216,10 @@ func (c *Client) Upload(queueID string, objects common.Objects) error {
 		}
 	}()
 
-	rel := &url.URL{Path: fmt.Sprintf("/api/v1/queue/%s", queueID)}
-	u := c.url.ResolveReference(rel)
+	u, err := url.Parse(fmt.Sprintf("%s/api/v1/queue/%s", c.endpoint, queueID))
+	if err != nil {
+		return err
+	}
 
 	request, err := http.NewRequest("PUT", u.String(), r)
 	if err != nil {

@@ -7,6 +7,7 @@ package ostree
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"unsafe"
 )
@@ -56,6 +57,43 @@ func OpenRepo(path string) (*Repo, error) {
 	repo := &Repo{path, unsafe.Pointer(repoC)}
 
 	var errC *C.GError
+	if C.ostree_repo_open(repoC, nil, &errC) == C.FALSE {
+		return nil, convertGError(errC)
+	}
+
+	return repo, nil
+}
+
+// CreateRepo creates the repository from path and opens it.
+func CreateRepo(path string) (*Repo, error) {
+	if path == "" {
+		return nil, errors.New("empty path")
+	}
+
+	// Create path if it doesn't exist
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.Mkdir(path, 0755)
+	}
+
+	pathC := C.CString(path)
+	defer C.free(unsafe.Pointer(pathC))
+
+	repoPath := C.g_file_new_for_path(pathC)
+	defer C.g_object_unref(C.gpointer(repoPath))
+
+	repoC := C.ostree_repo_new(repoPath)
+	if repoC == nil {
+		return nil, errors.New("failed to open repository")
+	}
+
+	repo := &Repo{path, unsafe.Pointer(repoC)}
+
+	var errC *C.GError
+
+	if C.ostree_repo_create(repoC, C.OSTREE_REPO_MODE_ARCHIVE, nil, &errC) == C.FALSE {
+		return nil, convertGError(errC)
+	}
+
 	if C.ostree_repo_open(repoC, nil, &errC) == C.FALSE {
 		return nil, convertGError(errC)
 	}

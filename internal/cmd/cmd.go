@@ -84,12 +84,6 @@ func receiveCmd() *cobra.Command {
 			// Toggle debug output
 			logger.SetVerbose(verbose)
 
-			// Check if reposotory path exists
-			if _, err := os.Stat(repoPath); os.IsNotExist(err) {
-				logger.Fatalf("Path \"%s\" doesn't exist", repoPath)
-				return
-			}
-
 			// Queue
 			queue, err := receiver.NewQueue()
 			if err != nil {
@@ -98,10 +92,19 @@ func receiveCmd() *cobra.Command {
 			}
 
 			// Open repository
-			repo, err := ostree.OpenRepo(repoPath)
-			if err != nil {
-				logger.Fatalf("Failed to open OSTree repository: %v", err)
-				return
+			var repo *ostree.Repo
+			if _, err := os.Stat(repoPath); os.IsNotExist(err) {
+				repo, err = ostree.CreateRepo(repoPath)
+				if err != nil {
+					logger.Fatalf("Failed to create OSTree repository: %v", err)
+					return
+				}
+			} else {
+				repo, err = ostree.OpenRepo(repoPath)
+				if err != nil {
+					logger.Fatalf("Failed to open OSTree repository: %v", err)
+					return
+				}
 			}
 
 			// Create temporary directory

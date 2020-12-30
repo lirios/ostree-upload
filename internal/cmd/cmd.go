@@ -120,6 +120,15 @@ func receiveCmd() *cobra.Command {
 				return
 			}
 
+			// Prune the repository before we begin
+			logger.Infof("Pruning repository...")
+			total, pruned, size, err := repo.Prune(false, false)
+			if err != nil {
+				logger.Fatalf("Failed to prune repository: %v", err)
+				return
+			}
+			logger.Infof("Pruned %d/%d objects, %d bytes deleted", pruned, total, size)
+
 			appState := &receiver.AppState{Queue: queue, Repo: repo, Config: config}
 			if err := receiver.StartServer(bindAddress, appState); err != nil {
 				logger.Fatal(err)

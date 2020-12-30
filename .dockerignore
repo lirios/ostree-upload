@@ -5,3 +5,5 @@
 *~
 *.swp
 /bin/
+/.git/
+/repo/
